@@ -1,54 +1,34 @@
 import streamlit as st
 import pickle
-import string
-from nltk.corpus import stopwords
-import nltk
-from nltk.stem.porter import PorterStemmer
 
-ps = PorterStemmer()
+# Load the trained model and vectorizer
+with open('model.pkl', 'rb') as model_file:
+    model = pickle.load(model_file)
 
+# Load the vectorizer if needed
+with open('vectorizer.pkl', 'rb') as vectorizer_file:
+    vectorizer = pickle.load(vectorizer_file)
 
-def transform_text(text):
-    text = text.lower()
-    text = nltk.word_tokenize(text)
+# Function to classify email
+def classify_email(email_text):
+    prediction = model.predict([email_text])
+    return prediction[0]
 
-    y = []
-    for i in text:
-        if i.isalnum():
-            y.append(i)
+# Streamlit app
+st.title('Email Spam Classifier')
 
-    text = y[:]
-    y.clear()
+st.write("""
+    This app classifies emails as spam or ham.
+    Enter the email content below and click the "Classify" button to get the prediction.
+""")
 
-    for i in text:
-        if i not in stopwords.words('english') and i not in string.punctuation:
-            y.append(i)
+# Input from the user
+email_text = st.text_area("Enter the email content here:")
 
-    text = y[:]
-    y.clear()
-
-    for i in text:
-        y.append(ps.stem(i))
-
-    return " ".join(y)
-
-tfidf = pickle.load(open('vectorizer.pkl','rb'))
-model = pickle.load(open('model.pkl','rb'))
-
-st.title("Email/SMS Spam Classifier")
-
-input_sms = st.text_area("Enter the message")
-
-if st.button('Predict'):
-
-    # 1. preprocess
-    transformed_sms = transform_text(input_sms)
-    # 2. vectorize
-    vector_input = tfidf.transform([transformed_sms])
-    # 3. predict
-    result = model.predict(vector_input)[0]
-    # 4. Display
-    if result == 1:
-        st.header("Spam")
+# Button to classify the email
+if st.button('Classify'):
+    if email_text:
+        prediction = classify_email(email_text)
+        st.write(f"The email is classified as: **{prediction}**")
     else:
-        st.header("Not Spam")
+        st.write("Please enter some email content to classify.")
