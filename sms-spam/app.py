@@ -1,55 +1,54 @@
 import streamlit as st
-import subprocess
-import sys
-
-# Function to install a package using pip
-def install_package(package_name):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-
-# Attempt to import sklearn and install if not found
-try:
-    import sklearn
-except ImportError:
-    st.write("`scikit-learn` is not installed. Installing now...")
-    install_package('scikit-learn')
-    import sklearn  # Retry import after installation
-
 import pickle
+import string
+from nltk.corpus import stopwords
+import nltk
+from nltk.stem.porter import PorterStemmer
 
-# Load the trained model and vectorizer
-try:
-    with open('model.pkl', 'rb') as model_file:
-        model = pickle.load(model_file)
+ps = PorterStemmer()
 
-    with open('vectorizer.pkl', 'rb') as vectorizer_file:
-        vectorizer = pickle.load(vectorizer_file)
-except FileNotFoundError as e:
-    st.error(f"File not found: {e}")
-    st.stop()
-except Exception as e:
-    st.error(f"An error occurred: {e}")
-    st.stop()
 
-# Function to classify email
-def classify_email(email_text):
-    prediction = model.predict([email_text])
-    return prediction[0]
+def transform_text(text):
+    text = text.lower()
+    text = nltk.word_tokenize(text)
 
-# Streamlit app
-st.title('Email Spam Classifier')
+    y = []
+    for i in text:
+        if i.isalnum():
+            y.append(i)
 
-st.write("""
-    This app classifies emails as spam or ham.
-    Enter the email content below and click the "Classify" button to get the prediction.
-""")
+    text = y[:]
+    y.clear()
 
-# Input from the user
-email_text = st.text_area("Enter the email content here:")
+    for i in text:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            y.append(i)
 
-# Button to classify the email
-if st.button('Classify'):
-    if email_text:
-        prediction = classify_email(email_text)
-        st.write(f"The email is classified as: **{prediction}**")
+    text = y[:]
+    y.clear()
+
+    for i in text:
+        y.append(ps.stem(i))
+
+    return " ".join(y)
+
+tfidf = pickle.load(open('vectorizer.pkl','rb'))
+model = pickle.load(open('model.pkl','rb'))
+
+st.title("Email/SMS Spam Classifier")
+
+input_sms = st.text_area("Enter the message")
+
+if st.button('Predict'):
+
+    # 1. preprocess
+    transformed_sms = transform_text(input_sms)
+    # 2. vectorize
+    vector_input = tfidf.transform([transformed_sms])
+    # 3. predict
+    result = model.predict(vector_input)[0]
+    # 4. Display
+    if result == 1:
+        st.header("Spam")
     else:
-        st.write("Please enter some email content to classify.")
+        st.header("Not Spam")
